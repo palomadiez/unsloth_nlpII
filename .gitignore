@@ -1,0 +1,25 @@
+# Byte-compiled / cache
+__pycache__/
+*.pyc
+
+# Data and results
+/results/
+/work/results/
+
+# Model weights and large artifacts
+*.safetensors
+*.pt
+*.bin
+*.model
+tokenizer.model
+tokenizer.json
+
+# Unsloth compiled cache and locks
+/unsloth_compiled_cache/
+
+# OS files
+.DS_Store
+
+# Temporary files
+/tmp/
+*.tar.gz
