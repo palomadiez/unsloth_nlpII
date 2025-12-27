@@ -2,9 +2,8 @@
 __pycache__/
 *.pyc
 
-# Data and results
-/results/
-/work/results/
+# Data (keep large results versioned if desired)
+# Note: `/results/` is intentionally NOT ignored to allow committing artifacts
 
 # Model weights and large artifacts
 *.safetensors

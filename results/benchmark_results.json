@@ -1,0 +1,29 @@
+[
+  {
+    "prompt": "Explain the concept of reinforcement learning.",
+    "total_time_seconds": 0.976426362991333,
+    "tokens_generated": 1,
+    "tokens_per_second": 1.024142769902738,
+    "memory_before_MB": 1866.47265625,
+    "memory_after_MB": 2309.22265625,
+    "memory_used_MB": 442.75
+  },
+  {
+    "prompt": "Write a short poem about the ocean.",
+    "total_time_seconds": 0.02997589111328125,
+    "tokens_generated": 1,
+    "tokens_per_second": 33.36014252990583,
+    "memory_before_MB": 2309.22265625,
+    "memory_after_MB": 2309.22265625,
+    "memory_used_MB": 0.0
+  },
+  {
+    "prompt": "What is the difference between supervised and unsupervised learning?",
+    "total_time_seconds": 0.029175281524658203,
+    "tokens_generated": 1,
+    "tokens_per_second": 34.275590422489174,
+    "memory_before_MB": 2309.22265625,
+    "memory_after_MB": 2309.22265625,
+    "memory_used_MB": 0.0
+  }
+]
