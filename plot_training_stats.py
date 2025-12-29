@@ -3,13 +3,13 @@ import json
 import matplotlib.pyplot as plt
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATE_FILE = os.path.join(PROJECT_DIR, "results", "trainer_state.json")
+STATE_FILE = os.path.join(PROJECT_DIR, "results", "unsloth_lora", "training_log.json")
 OUT_DIR = os.path.join(PROJECT_DIR, "results")
 
 with open(STATE_FILE) as f:
     state = json.load(f)
 
-log_history = state["log_history"]
+log_history = state
 
 steps = []
 losses = []
@@ -20,7 +20,6 @@ for entry in log_history:
     if "loss" in entry:
         steps.append(entry["step"])
         losses.append(entry["loss"])
-        grad_norms.append(entry.get("grad_norm", None))
         learning_rates.append(entry.get("learning_rate", None))
 
 # -----------------------------
@@ -39,7 +38,7 @@ plt.close()
 # -----------------------------
 # 2. GRAD NORM
 # -----------------------------
-plt.figure(figsize=(8, 5))
+"""plt.figure(figsize=(8, 5))
 plt.plot(steps, grad_norms)
 plt.title("Gradient Norm")
 plt.xlabel("Step")
@@ -47,7 +46,7 @@ plt.ylabel("Grad Norm")
 plt.grid(True)
 plt.tight_layout()
 plt.savefig(os.path.join(OUT_DIR, "grad_norm_curve.png"))
-plt.close()
+plt.close()"""
 
 # -----------------------------
 # 3. LEARNING RATE

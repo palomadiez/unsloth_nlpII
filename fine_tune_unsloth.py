@@ -101,6 +101,7 @@ for epoch in range(EPOCHS):
             "epoch": epoch + 1,
             "step": global_step,
             "loss": loss.item(),
+            "learning_rate": optimizer.param_groups[0]['lr']
         })
 
 print("\nTraining completed.")
