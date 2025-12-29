@@ -2,9 +2,10 @@ import os
 import json
 import torch
 from datasets import load_from_disk
-from transformers import AutoTokenizer, AutoModelForCausalLM
-from peft import PeftModel
+from unsloth import FastLanguageModel
+from transformers import AutoTokenizer
 import evaluate
+from tqdm import tqdm
 
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -14,6 +15,7 @@ OUTPUT_FILE = os.path.join(PROJECT_DIR, "results", "unsloth_metrics.json")
 
 # Load test set
 test = load_from_disk(os.path.join(DATA_DIR, "test"))
+test = test.select(range(20))
 
 # Format data function
 def format_instruction(example):
@@ -21,18 +23,20 @@ def format_instruction(example):
     return prompt
 
 # Load model + LoRA adapter
-print("Loading model...")
-base_model = AutoModelForCausalLM.from_pretrained(
-    "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    device_map="cpu"
+model, tokenizer = FastLanguageModel.from_pretrained(
+    model_name="TinyLlama/TinyLlama-1.1B-Chat-v1.0",
+    max_seq_length=2048,
+    dtype=torch.float16,
+    load_in_4bit=True,
 )
 
-model = PeftModel.from_pretrained(base_model, MODEL_DIR)
+# Cargar LoRA entrenado
+model.load_adapter(MODEL_DIR)
 
-tokenizer = AutoTokenizer.from_pretrained(
-    "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
-)
+# Activar modo inferencia
+FastLanguageModel.for_inference(model)
 
+device = "cuda" if torch.cuda.is_available() else "cpu"
 model.eval()
 
 # Evaluators
@@ -54,27 +58,28 @@ print("Generating predictions on the test set...")
 
 # print(tokenizer.decode(output_ids[0], skip_special_tokens=True))
 
-test = test.select(range(20))
-
-for sample in test:
+for sample in tqdm(test):
     prompt = format_instruction(sample)
-    inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+
+    inputs = tokenizer(
+        prompt,
+        return_tensors="pt",
+        truncation=True,
+        max_length=512,
+    ).to(device)
 
     with torch.no_grad():
         output_ids = model.generate(
             **inputs,
             max_new_tokens=128,
-            temperature=0.2
+            temperature=0.2,
+            do_sample=False,
         )
 
-    pred = tokenizer.decode(output_ids[0], skip_special_tokens=True)
-
-    # We need only the model's response, not the entire prompt
-    pred = pred.split("### Response:")[-1].strip()
-
+    decoded = tokenizer.decode(output_ids[0], skip_special_tokens=True)
+    pred = decoded.split("### Response:")[-1].strip()
     ref = sample["response"]
-    #print(pred)
-    #print(ref)
+
     predictions.append(pred)
     references.append(ref)
 

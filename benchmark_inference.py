@@ -8,7 +8,6 @@ from unsloth import FastLanguageModel
 import numpy as np
 from datasets import Dataset
 from peft import PeftModel
-from transformers import AutoModelForCausalLM
 
 # Configuración
 PATH_ARROW = "data/dolly/test/data-00000-of-00001.arrow"
@@ -22,7 +21,7 @@ TOP_P = 0.9
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 MODEL_DIR = os.path.join(PROJECT_DIR, "results", "unsloth_lora")
-CSV_OUTPUT = os.path.join(PROJECT_DIR, "results", "unsloth_metrics", "unsloth_peft_comparative_metrics.csv")
+CSV_OUTPUT = os.path.join(PROJECT_DIR, "results", "unsloth_comparative_metrics.csv")
 
 # Modelo base usado también en HF
 BASE_MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
@@ -32,20 +31,15 @@ print("Loading model for inference benchmark...")
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = BASE_MODEL,
     max_seq_length = 2048,
-    load_in_4bit = False      # Cambia a True si usaste QLoRA en Unsloth
+    dtype = torch.float16,
+    load_in_4bit = False,      # Cambia a True si usaste QLoRA en Unsloth
 )
+# Cargar LoRA entrenado
+model.load_adapter(MODEL_DIR)
+FastLanguageModel.for_inference(model)
+device = "cuda" if torch.cuda.is_available() else "cpu"
+model.to(device)
 model.eval()
-
-print("Loading PEFT model...")
-peft_base_model = AutoModelForCausalLM.from_pretrained(
-    "TinyLlama/TinyLlama-1.1B-Chat-v1.0",
-    device_map="cpu"
-)
-peft_model = PeftModel.from_pretrained(
-    peft_base_model,
-    MODEL_DIR
-)
-peft_model.eval()
 
 # Preparación de prompts Dolly
 def prepare_dolly_prompt(ejemplo):
@@ -63,7 +57,9 @@ def get_peak_memory_mb():
 
 # Benchmark por intento
 def run_single_inference(prompt, model):
+    device = next(model.parameters()).device
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
+    inputs = {k: v.to(device) for k, v in inputs.items()}
 
     start_time = time.time()
     with torch.no_grad():
@@ -125,8 +121,7 @@ if __name__ == "__main__":
         prompt = prepare_dolly_prompt(ejemplo)
         print(f"\n[Ejemplo {i+1}] Categoría: {ejemplo['category']}")
 
-        base_metrics = benchmark_prompt(prompt, base_model, N_INTENTOS)
-        peft_metrics = benchmark_prompt(prompt, peft_model, N_INTENTOS)
+        base_metrics = benchmark_prompt(prompt, model, N_INTENTOS)
 
         results.append({
         "id": i + 1,
@@ -138,12 +133,6 @@ if __name__ == "__main__":
         "base_throughput_tps": base_metrics["throughput_tokens_sec"],
         "base_peak_memory_mb": base_metrics["peak_memory_mb"],
         "base_output_text": base_metrics["output_text"],
-
-        # PEFT model
-        "peft_latency_s": peft_metrics["latency_per_request_s"],
-        "peft_throughput_tps": peft_metrics["throughput_tokens_sec"],
-        "peft_peak_memory_mb": peft_metrics["peak_memory_mb"],
-        "peft_output_text": peft_metrics["output_text"],
         })
 
 
@@ -159,7 +148,8 @@ if __name__ == "__main__":
     # Print results
     print("\n===== Unsloth Inference Benchmark Results =====")
     for r in results:
-        print("\nPrompt:", r["prompt"])
+        print("R", r)
+        """print("\nPrompt:", r["prompt"])
         print("Total Time (s):", r["total_time_seconds"])
         print("Tokens/s:", r["tokens_per_second"])
-        print("Memory Used (MB):", r["memory_used_MB"]) 
+        print("Memory Used (MB):", r["memory_used_MB"]) """
