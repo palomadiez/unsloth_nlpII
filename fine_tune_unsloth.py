@@ -6,12 +6,18 @@ from unsloth import FastLanguageModel
 from utils import format_dolly
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from transformers import AdamW
+from torch.optim import AdamW
+
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_DIR, "data", "dolly")
-#OUTPUT_DIR = os.path.join(PROJECT_DIR, "results", "unsloth_lora")
-#os.makedirs(OUTPUT_DIR, exist_ok=True)
+OUTPUT_DIR = os.path.expanduser("~/unsloth_results")
+
+# Hyperparams
+R_LORA = 32
+ALPHA_LORA= 4*R_LORA
+BATCH_SIZE = 16
+LEARNING_RATE = 2e-4
 
 # Datasets
 train_full = load_from_disk(os.path.join(DATA_DIR, "train"))
@@ -51,11 +57,10 @@ train.set_format("torch")
 dev.set_format("torch")
 
 # Add LoRA adapter using PEFT
-# r=4
 model = FastLanguageModel.get_peft_model(
     model,
-    r=4,
-    lora_alpha=16,
+    r=R_LORA,
+    lora_alpha=ALPHA_LORA,
     lora_dropout=0.05,
     target_modules=[
         "q_proj", "k_proj", "v_proj", "o_proj",
@@ -66,8 +71,8 @@ model = FastLanguageModel.get_peft_model(
 )
 
 # Dataloaders
-train_loader = DataLoader(train, batch_size=1, shuffle=True)
-dev_loader = DataLoader(dev, batch_size=1)
+train_loader = DataLoader(train, batch_size=BATCH_SIZE, shuffle=True)
+dev_loader = DataLoader(dev, batch_size=BATCH_SIZE)
 
 device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
@@ -106,9 +111,10 @@ for epoch in range(EPOCHS):
 print("\nTraining completed.")
 
 # Save model
-model.save_pretrained(os.path.join(PROJECT_DIR, "results", "unsloth"))
-tokenizer.save_pretrained(os.path.join(PROJECT_DIR, "results", "unsloth"))
+os.makedirs(OUTPUT_DIR, exist_ok=True)
+model.save_pretrained(OUTPUT_DIR)
+tokenizer.save_pretrained(OUTPUT_DIR)
 
 # Save training history to disk for plotting/collection
-# with open(os.path.join(OUTPUT_DIR, "training_log.json"), "w") as f:
-#     json.dump(training_history, f, indent=2)
+with open(os.path.join(OUTPUT_DIR, "training_log.json"), "w") as f:
+    json.dump(training_history, f, indent=2)

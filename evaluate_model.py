@@ -3,16 +3,14 @@ import json
 import torch
 from datasets import load_from_disk
 from unsloth import FastLanguageModel
-from transformers import AutoTokenizer
 import evaluate
 from tqdm import tqdm
 
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_DIR, "data", "dolly")
-MODEL_DIR = os.path.join(PROJECT_DIR, "results", "unsloth_lora")
-OUTPUT_FILE = os.path.join(PROJECT_DIR, "results", "unsloth_metrics.json")
-
+MODEL_DIR = os.path.expanduser("~/unsloth_results")
+OUTPUT_FILE = os.path.expanduser("~/outputs/r4_b64")
 # Load test set
 test = load_from_disk(os.path.join(DATA_DIR, "test"))
 test = test.select(range(20))
@@ -103,5 +101,7 @@ results = {
 
 with open(OUTPUT_FILE, "w") as f:
     json.dump(results, f, indent=4)
+
+print(results)
 
 print(f"\nEvaluation complete. Results saved to {OUTPUT_FILE}")

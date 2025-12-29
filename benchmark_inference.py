@@ -7,7 +7,6 @@ import json
 from unsloth import FastLanguageModel
 import numpy as np
 from datasets import Dataset
-from peft import PeftModel
 
 # Configuración
 PATH_ARROW = "data/dolly/test/data-00000-of-00001.arrow"
@@ -20,8 +19,8 @@ TOP_P = 0.9
 
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-MODEL_DIR = os.path.join(PROJECT_DIR, "results", "unsloth_lora")
-CSV_OUTPUT = os.path.join(PROJECT_DIR, "results", "unsloth_comparative_metrics.csv")
+MODEL_DIR = os.path.expanduser("~/unsloth_results")
+CSV_OUTPUT = os.path.expanduser("~/benchmark_unsloth_base_vs_ft")
 
 # Modelo base usado también en HF
 BASE_MODEL = "TinyLlama/TinyLlama-1.1B-Chat-v1.0"
@@ -32,14 +31,25 @@ model, tokenizer = FastLanguageModel.from_pretrained(
     model_name = BASE_MODEL,
     max_seq_length = 2048,
     dtype = torch.float16,
-    load_in_4bit = False,      # Cambia a True si usaste QLoRA en Unsloth
+    load_in_4bit = True,      # Cambia a True si usaste QLoRA en Unsloth
 )
-# Cargar LoRA entrenado
-model.load_adapter(MODEL_DIR)
 FastLanguageModel.for_inference(model)
 device = "cuda" if torch.cuda.is_available() else "cpu"
-model.to(device)
+# model.to(device)
 model.eval()
+
+# FT MODEL
+ft_model, _ = FastLanguageModel.from_pretrained(
+    model_name=BASE_MODEL,
+    max_seq_length=2048,
+    dtype=torch.float16,
+    load_in_4bit=True,
+)
+
+ft_model.load_adapter(MODEL_DIR)
+FastLanguageModel.for_inference(ft_model)
+ft_model.eval()
+
 
 # Preparación de prompts Dolly
 def prepare_dolly_prompt(ejemplo):
@@ -50,17 +60,13 @@ def prepare_dolly_prompt(ejemplo):
     else:
         return f"Instruction: {instruccion}\nResponse:"
     
-# Memoria pico (RSS)
-def get_peak_memory_mb():
-    process = psutil.Process(os.getpid())
-    return process.memory_info().rss / (1024 * 1024)
-
 # Benchmark por intento
 def run_single_inference(prompt, model):
     device = next(model.parameters()).device
     inputs = tokenizer(prompt, return_tensors="pt", truncation=True, max_length=512)
     inputs = {k: v.to(device) for k, v in inputs.items()}
 
+    torch.cuda.reset_peak_memory_stats()
     start_time = time.time()
     with torch.no_grad():
         output_ids = model.generate(
@@ -73,6 +79,8 @@ def run_single_inference(prompt, model):
     end_time = time.time()
 
     latency = end_time - start_time
+    peak_memory_mb = torch.cuda.max_memory_allocated() / 1024**2
+
     prompt_len = inputs["input_ids"].shape[1]
     tokens_generated = output_ids.shape[1] - prompt_len
     tps = tokens_generated / latency if latency > 0 else 0
@@ -82,29 +90,29 @@ def run_single_inference(prompt, model):
         skip_special_tokens=True
     )
 
-    return latency, tps, tokens_generated, response
+    return latency, tps, peak_memory_mb, response
 
 # Benchmark completo
 def benchmark_prompt(prompt, model, n_iterations):
     latencies = []
     throughputs = []
+    memories = []
     last_response = ""
 
     print(f"  -> Evaluando {n_iterations} intentos...")
 
     for _ in range(n_iterations):
-        latency, tps, _, response = run_single_inference(prompt, model)
+        latency, tps, memory, response = run_single_inference(prompt, model)
         latencies.append(latency)
         throughputs.append(tps)
+        memories.append(memory)
         last_response = response
-
-    peak_mem = get_peak_memory_mb()
 
     return {
         "output_text": last_response,
         "latency_per_request_s": np.mean(latencies),
         "throughput_tokens_sec": np.mean(throughputs),
-        "peak_memory_mb": peak_mem
+        "peak_memory_mb": max(memories)
     }
 
 
@@ -122,6 +130,7 @@ if __name__ == "__main__":
         print(f"\n[Ejemplo {i+1}] Categoría: {ejemplo['category']}")
 
         base_metrics = benchmark_prompt(prompt, model, N_INTENTOS)
+        ft_metrics = benchmark_prompt(prompt, ft_model, N_INTENTOS)
 
         results.append({
         "id": i + 1,
@@ -133,6 +142,12 @@ if __name__ == "__main__":
         "base_throughput_tps": base_metrics["throughput_tokens_sec"],
         "base_peak_memory_mb": base_metrics["peak_memory_mb"],
         "base_output_text": base_metrics["output_text"],
+
+        # FINE-TUNED MODEL
+        "ft_latency_s": ft_metrics["latency_per_request_s"],
+        "ft_throughput_tps": ft_metrics["throughput_tokens_sec"],
+        "ft_peak_memory_mb": ft_metrics["peak_memory_mb"],
+        "ft_output_text": ft_metrics["output_text"],
         })
 
 
@@ -148,8 +163,14 @@ if __name__ == "__main__":
     # Print results
     print("\n===== Unsloth Inference Benchmark Results =====")
     for r in results:
-        print("R", r)
-        """print("\nPrompt:", r["prompt"])
-        print("Total Time (s):", r["total_time_seconds"])
-        print("Tokens/s:", r["tokens_per_second"])
-        print("Memory Used (MB):", r["memory_used_MB"]) """
+        print("\nCategory:", r["category"])
+        print("BASE---------------")
+        print("Total Time (s):", r["base_latency_s"])
+        print("Tokens/s:", r["base_throughput_tps"])
+        print("Memory Used (MB):", r["base_peak_memory_mb"])
+        print("Response Unsloth: ", r["base_output_text"])
+        print("FT-----------------")
+        print("Total Time (s):", r["ft_latency_s"])
+        print("Tokens/s:", r["ft_throughput_tps"])
+        print("Memory Used (MB):", r["ft_peak_memory_mb"])
+        print("Response Unsloth: ", r["ft_output_text"])
