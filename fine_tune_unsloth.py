@@ -6,13 +6,12 @@ from unsloth import FastLanguageModel
 from utils import format_dolly
 from torch.utils.data import DataLoader
 from tqdm import tqdm
-from bitsandbytes.optim import AdamW8bit
-
+from transformers import AdamW
 # Paths
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 DATA_DIR = os.path.join(PROJECT_DIR, "data", "dolly")
-OUTPUT_DIR = os.path.join(PROJECT_DIR, "results", "unsloth_lora")
-os.makedirs(OUTPUT_DIR, exist_ok=True)
+#OUTPUT_DIR = os.path.join(PROJECT_DIR, "results", "unsloth_lora")
+#os.makedirs(OUTPUT_DIR, exist_ok=True)
 
 # Datasets
 train_full = load_from_disk(os.path.join(DATA_DIR, "train"))
@@ -74,7 +73,7 @@ device = "cuda" if torch.cuda.is_available() else "cpu"
 model.to(device)
 
 # Optimizer
-optimizer = AdamW8bit(model.parameters(), lr=2e-4)
+optimizer = AdamW(model.parameters(), lr=2e-4)
 
 # Training loop
 print("\nStarting Unsloth training...\n")
@@ -107,13 +106,9 @@ for epoch in range(EPOCHS):
 print("\nTraining completed.")
 
 # Save model
-model.save_pretrained(OUTPUT_DIR)
-tokenizer.save_pretrained(OUTPUT_DIR)
+model.save_pretrained(os.path.join(PROJECT_DIR, "results", "unsloth"))
+tokenizer.save_pretrained(os.path.join(PROJECT_DIR, "results", "unsloth"))
 
 # Save training history to disk for plotting/collection
-with open(os.path.join(OUTPUT_DIR, "training_log.json"), "w") as f:
-    json.dump(training_history, f, indent=2)
-
-print(f"Training log saved to: {os.path.join(OUTPUT_DIR, 'training_log.json')}")
-
-print(f"Model saved to: {OUTPUT_DIR}")
+# with open(os.path.join(OUTPUT_DIR, "training_log.json"), "w") as f:
+#     json.dump(training_history, f, indent=2)
