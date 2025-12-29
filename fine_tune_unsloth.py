@@ -66,7 +66,7 @@ dev.set_format("torch")
 model, tokenizer = FastLanguageModel.from_pretrained(
     model_name=model_name,
     max_seq_length=2048,
-    load_in_4bit=False,  # Cambiar a True si quieres QLoRA
+    load_in_4bit=False,
 )
 
 # Add LoRA adapter using PEFT
@@ -90,12 +90,12 @@ model.to(device)
 # Optimizer
 optimizer = AdamW(model.parameters(), lr=2e-4)
 
-# Training loop similar lógica al script HF
+# Training loop
 EPOCHS = 5
 
 print("\nStarting Unsloth training...\n")
 
-# Prepare training history logging
+# Historial
 training_history = []
 
 for epoch in range(EPOCHS):

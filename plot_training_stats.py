@@ -3,8 +3,8 @@ import json
 import matplotlib.pyplot as plt
 
 PROJECT_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
-STATE_FILE = os.path.join(PROJECT_DIR, "results", "hf_lora", "checkpoint-125", "trainer_state.json")
-OUT_DIR = os.path.join(PROJECT_DIR, "results", "hf")
+STATE_FILE = os.path.join(PROJECT_DIR, "results", "trainer_state.json")
+OUT_DIR = os.path.join(PROJECT_DIR, "results")
 
 with open(STATE_FILE) as f:
     state = json.load(f)
